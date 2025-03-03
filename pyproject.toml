@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SIMPApy"
+version = "0.0.2"
+description = "Normalized Single Sample Integrated Multiomics Pathway Analysis"
+readme = "README.md"
+authors = [
+    {name = "Hasan Alsharoh", email = "hasanalsharoh@gmail.com"}
+]
+license = {text = "Apache License (2.0)"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics"
+]
+requires-python = ">=3.8"
+dependencies = [
+    "gseapy==1.1.3",
+    "numpy==1.23.5",
+    "scipy==1.14.0",
+    "pandas==2.2.2",
+    "pydeseq2==0.4.10",
+    "matplotlib==3.9.2",
+    "plotly==5.24.1",
+    "scikit-learn==1.5.1",
+    "seaborn==0.13.2",
+    "statsmodels==0.14.1",
+    "ipywidgets==8.1.5",
+    "pillow==10.4.0",
+    "kaleido==0.1.0.post1"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/hasanalsharoh/SIMPApy"
+"Bug Tracker" = "https://github.com/hasanalsharoh/SIMPApy/issues"
+
+[tool.setuptools]
+packages = ["SIMPApy"]
+include-package-data = false
