@@ -180,27 +180,47 @@ The could would show the figure below, which can be rotated and interacted with
 ![.](https://github.com/hasanalsharoh/SIMPApy/blob/main/images/3D_interactive_plot.png)
 
 In the figure, each dot is a single gene in a single sample. On hovering each datapoint, the following data is shown:
+            
             - Gene: Gene name of hovered datapoint
+            
             - Sample: Sample name datapoint belongs to
+            
             - Term: Term the datapoint enriches (in general, the Term/pathway would match the dropdown menu's Term)
+            
             - Cancer Type: clinical information (if available)
+            
             - AJCC Stage: clinical (if available) 
+            
             - DNAm: DNA methylation beta value
+            
             - TPM: TPM value (clipped to 1,000)
+            
             - CNV: Copy number value
+            
             - Enrichment: NES or MPES
+            
             - Tagged: 1 if leading edge (impactful on enrichment), 0 if not. This is determined by the GSEA algorithm
+            
             - Multiomics FDR: BH-corrected p-value for the Term/pathway the datapoint belongs to.
 
 Figure settings allow the following:
+    
     - Term (dropdown menu): Filtering based on pathway/term
+    
     - Omic Type (dropdown menu): Changes color based on enrichment of the selected omic (options are RNA, CNV, DNA, MPES)
+    
     - Cancer Type (dropdown menu): Filtering based on clinical information
+    
     - AJCC Stage (dropdown menu): Filtering based on clinical information
+    
     - Filter by (buttons): This setting is used prior to search in the Search box. If sample is selected, the search box filters all datapoints to match the sample searched for. If gene selected, the search box will filter the datapoints to include only genes matching the gene name searched for.
+    
     - Search (search box): After the selection of Sample/Gene from the *Filter by* option, the search box will retrieve matching variables (not case sensitive). After writing, click *Search*.
+    
     - Normalize Untagged (checkbox): This setting allows for normalizing untagged datapoints (Tagged = 0), by controlling their NES values to 0. This option is mainly for single -omics, as on MPES, all -omics must be tagged for a single datapoint for it to not be normalized.
+    
     - Reset View (button): Restores the view to unfiltered.
+    
     - Export (300DPI): This options exports the current view of the 3D box.
             
 ## Requirements
