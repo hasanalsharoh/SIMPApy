@@ -177,7 +177,7 @@ sp.create_interactive_plot(twas, # loading dataframe
 
 The could would show the figure below, which can be rotated and interacted with
 
-![](https://github.com/hasanalsharoh/SIMPApy/tree/main/images/3D_interactive_plot.png)
+![.](https://github.com/hasanalsharoh/SIMPApy/blob/main/images/3D_interactive_plot.png)
 
 In the figure, each dot is a single gene in a single sample. On hovering each datapoint, the following data is shown:
             - Gene: Gene name of hovered datapoint
