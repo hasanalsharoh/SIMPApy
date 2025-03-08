@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SIMPApy"
-version = "0.0.2"
+dynamic = ["version"]
 description = "Normalized Single Sample Integrated Multiomics Pathway Analysis"
 readme = "README.md"
 authors = [
@@ -42,3 +42,6 @@ dependencies = [
 [tool.setuptools]
 packages = ["SIMPApy"]
 include-package-data = false
+
+[tool.setuptools.dynamic]
+version = {attr = "SIMPApy.__version__"}
