@@ -213,7 +213,7 @@ Figure settings allow the following:
     
     - AJCC Stage (dropdown menu): Filtering based on clinical information
     
-    - Filter by (buttons): This setting is used prior to search in the Search box. If sample is selected, the search box filters all datapoints to match the sample searched for. If gene selected, the search box will filter the datapoints to include only genes matching the gene name searched for.
+    - Filter by (buttons): This setting is used prior to search in the Search box. If sample is selected, the search box filters all datapoints to match the sample searched for. If gene selected, the search box will filter the datapoints to include only genes matching the gene name searched for. Clicking behavior, when clicking the datapoints, is also affected by the *Filter by* setting
     
     - Search (search box): After the selection of Sample/Gene from the *Filter by* option, the search box will retrieve matching variables (not case sensitive). After writing, click *Search*.
     
