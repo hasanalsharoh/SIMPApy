@@ -175,7 +175,7 @@ sp.create_interactive_plot(twas, # loading dataframe
                             "TWA") # header title
 ```
 
-The could would show the figure below, which can be rotated and interacted with
+The code would show the figure below, which can be rotated and interacted with
 
 ![.](https://github.com/hasanalsharoh/SIMPApy/blob/main/images/3D_interactive_plot.png)
 
