@@ -25,5 +25,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/project/simpapy/ # Specify TestPyPI URL
-          username: __token__  # Use __token__ for API token authentication
+          user: __token__  # Use __token__ for API token authentication
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
