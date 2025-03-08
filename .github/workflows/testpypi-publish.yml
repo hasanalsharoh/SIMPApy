@@ -1,55 +1,32 @@
-name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+name: Publish to TestPyPI
 
-on: push
+on:
+  push:
+    tags:
+      - 'v*.*.*-alpha*'  # Trigger on alpha tags (e.g., v0.1.0-alpha1, v1.2.0-alpha)
+      - 'v*.*.*-beta*'   # Trigger on beta tags (e.g., v0.1.0-beta2, v1.0.0-beta)
+      - 'v*.*.*-rc*'     # Trigger on release candidate tags (e.g., v0.1.0-rc1, v1.0.0-rc)
+      - 'test-v*.*.*'    # Or use a different prefix like 'test-v' for test releases
 
 jobs:
-  build:
-    name: Build distribution 📦
+  build-and-publish:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
+      - name: Install build and twine
+        run: pip install build twine
 
-  publish-to-testpypi:
-    name: Publish Python 🐍 distribution 📦 to TestPyPI
-    needs:
-    - build
-    runs-on: ubuntu-latest
+      - name: Build package
+        run: python -m build
 
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/SIMPApy
-
-    permissions:
-      id-token: write  # IMPORTANT: mandatory for trusted publishing
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Publish distribution 📦 to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
+      - name: Upload package to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
