@@ -1,0 +1,29 @@
+name: Publish to TestPyPI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on tags like v0.1.0, v1.2.3
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'  # Or specify a version like '3.10'
+
+      - name: Install build and twine
+        run: pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload package to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/ # Specify TestPyPI URL
+          username: __token__  # Use __token__ for API token authentication
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
