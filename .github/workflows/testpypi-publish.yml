@@ -1,29 +1,55 @@
-name: Publish to TestPyPI
+name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
 
-on:
-  push:
-    tags:
-      - 'v*.*.*'  # Trigger on tags like v0.1.0, v1.2.3
+on: push
 
 jobs:
-  build-and-publish:
+  build:
+    name: Build distribution 📦
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'  # Or specify a version like '3.10'
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    - name: Install pypa/build
+      run: >-
+        python3 -m
+        pip install
+        build
+        --user
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
 
-      - name: Install build and twine
-        run: pip install build twine
 
-      - name: Build package
-        run: python -m build
+  publish-to-testpypi:
+    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    needs:
+    - build
+    runs-on: ubuntu-latest
 
-      - name: Upload package to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/project/simpapy/ # Specify TestPyPI URL
-          user: __token__  # Use __token__ for API token authentication
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/SIMPApy
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
