@@ -4,13 +4,12 @@ Normalized Single Sample Integrated Multi-Omics Pathway Analysis for Python
 
 ## Description
 
-`SIMPApy` is a Python package for performing Gene Set Enrichment Analysis (GSEA) on multi-omics data and integrating the results. It supports RNA sequencing, DNA methylation, and copy number variation data types.
+`SIMPApy` is a Python package for performing Gene Set Enrichment Analysis (GSEA) on multiomics data in single samples and integrating the results. It supports RNA sequencing, DNA methylation, and copy number variation data types.
 
 ## Installation
 
 
-To install SIMPApy, create a new virtual environment making sure to install the requirements found at the SIMPApy Git repository.
-Afterwards, use:
+To install SIMPApy, create a new virtual environment (preferably also installing Jupyter Notebooks through anaconda). Afterwards, use:
 ```bash
 pip install SIMPApy 
 ```
@@ -35,7 +34,7 @@ To use SOPA, we need raw data for a single -omic, and as follows:
         
         Assume 3 groups (group1, group2, group3). Analyses could be done between group1 and group2, and then group3 and group2, or group3 and group1, according to preference.
 
-### Calculate Rankings for Different Omics Types
+#### load libraries and data
 
 ```python
 import SIMPApy as sp
@@ -48,59 +47,23 @@ dna_data = pd.read_csv("dna.csv", index_col=0) # M-values
 meth_data = pd.read_csv("meth.csv", index_col=0) # beta values
 
 hallmark = "path/to/h.all.v2023.1.Hs.symbols.gmt" # hallmarks gene set
-
-# Calculate rankings for RNA-seq data
-rna_rankings = sp.calculate_ranking(
-    df=rna_data,
-    omic="RNA",
-    alpha=0.05
-)
-
-# Calculate rankings for CNV data
-cnv_data = pd.read_csv("cnv_data.csv", index_col=0)
-cnv_rankings = sp.calculate_ranking(
-    df=cnv_data,
-    omic="CNV"
-)
 ```
-
-### Integrate Multi-Omics GSEA Results
-
-```python
-import SIMPApy as sp
-
-# Run SIMPA for a single sample
-integrated_results = sp.simpa(
-    sample_id="sample1",
-    rna_dir="path/to/rna/gsea/results",
-    cnv_dir="path/to/cnv/gsea/results",
-    dna_dir="path/to/dna/gsea/results",
-    output_dir="path/to/output"
-)
-
-# Process multiple samples
-sample_ids = ["sample1", "sample2", "sample3"]
-sp.run_simpa_batch(
-    sample_ids=sample_ids,
-    rna_dir="path/to/rna/gsea/results",
-    cnv_dir="path/to/cnv/gsea/results",
-    dna_dir="path/to/dna/gsea/results",
-    output_dir="path/to/output"
-)
-```
-
 
 ## Single sample gene ranking
 ### RNAseq and DNAm M-values
 ```python
-rnaranks = sp.calculate_ranking(rna,omic='rna', alpha=0.05)
+rnaranks = sp.calculate_ranking(df= rna, omic='rna', alpha=0.05)
+
+# for DNAm
+dnaranks = sp.calculate_ranking(df= dna, omic='dnam', alpha=0.05)
 # assuming the following:
 # df: pandas DataFrame with gene expression data (genes as rows, samples as columns).
 ```
 After running the above functions, the following code should be used to retrieve the dataset:
 ```python
-# make a dataframe of rnaranks where index is gene names and columns are samples and only include "weighted" column
+# make a dataframe of rnaranks and dnaranks where index is gene names and columns are samples and only include "weighted" column
 rnaranks_df = pd.concat({k: v['weighted'] for k, v in rnaranks.items()}, axis=1)
+dnaranks_df = pd.concat({k: v['weighted'] for k, v in dnaranks.items()}, axis=1)
 ```
 ### CNV data
 Here, make sure to have copy number data. If GISTIC2 data is present (often through log(Copy_Number +1)), then conversion is usually done through 2**(GISTIC2_value -1)
@@ -238,6 +201,7 @@ Figure settings allow the following:
 - statsmodels==0.14.1
 - ipywidgets==8.1.5
 - pillow==10.4.0
+- kaleido==0.1.0.post1
 
 
 ## License
