@@ -68,8 +68,8 @@ dnaranks_df = pd.concat({k: v['weighted'] for k, v in dnaranks.items()}, axis=1)
 ### CNV data
 Here, make sure to have copy number data. If GISTIC2 data is present (often through log(Copy_Number +1)), then conversion is usually done through 2**(GISTIC2_value -1)
 ```python
-cnvs = sp.calculate_ranking(cn, omic = 'cnv'):
-# cn: Pandas DataFrame with gene-level copy numbers. 
+cnvs = sp.calculate_ranking(cnv_data, omic = 'cnv'):
+# cnv_data: Pandas DataFrame with gene-level copy numbers. 
 # Rows are genes and columns are samples ('tm' for cases, 'tw' for controls).
 ```
 Afterwards, retrieve the dataframe:
@@ -80,17 +80,12 @@ cnranks_df = pd.concat({k: v['adjusted_weight'] for k, v in cnranks.items()}, ax
 ## Running SOPA
 To run SOPA, we need 2 available files:
 
-- A single sample gene ranking dataset
+- A single sample gene ranking dataframe
 - a number of gene sets as a .gmt file
+
+multiple samples must be available in the single sample ranking dataframe, each column must be a sample name with gene names as rows. Gene names must be ENSEMBL IDs. We could run SOPA:
 ```python
-# to run SOPA on a single sample
-single_sample_results = sp.sopa(ranking, gene_set, minisz, seeder) # assuming is a dataframe of 1 column of ranking values, and rows (indices) as genes
-# minisz is the minimal gene set matching size
-# seeder is the random seed to maintain result consistency
-```
-if multiple samples are available in the single sample dataframe, each column must be a sample with ranking values as rows. Gene names must be ENSEMBL IDs. We could run SOPA after defining the function above and running the code:
-```python
-single_samples_output = sp.sopa_population(ranking_dataframe, gene_set_gmt_file, folder_to_contain_outputs_for_single_sample_enrichment_analysis)
+single_samples_output = sp.sopa(ranking_dataframe, gene_set_gmt_file, folder_to_contain_outputs_for_single_sample_enrichment_analysis)
 ```
 ## SIMPA
 To run SIMPA, we need to have RNAseq, CNV, and DNA methylation SOPA results in 3 different folders.
@@ -109,13 +104,13 @@ Then, we define the paths to RNA, CNVs, and DNAm SOPA results:
 # dna_dir = 'path/to/dna/sopa/results'
 
 # run SIMPA
-simpa_res = sp.run_simpa_batch(rna_dir, cnv_dir, dna_dir, output_directory)
+simpa_res = sp.simpa(sample_ids, rna_dir, cnv_dir, dna_dir, output_directory)
 
 ```
 ### Visualization of SIMPA results
 Prior to visualization using 3D box, we need 4 - 5 datasets, and as follows:
 - Mandatory:
-    - SIMPA results dataframe from running run_simpa_batch
+    - SIMPA results dataframe from running simpa()
     - RNAseq raw data (preferably TPM values, as algorithm clips values at 1,000 TPM)
     - CNVs raw data (copy numbers)
     - DNAm raw data (beta values)
