@@ -138,9 +138,9 @@ sp.create_interactive_plot(twas, # loading dataframe
                             "TWA") # header title
 ```
 
-The code would show the figure below, which can be rotated and interacted with
+The code would show the figure below, which can be rotated and interacted with inside jupyter notebooks:
 
-![.](https://github.com/hasanalsharoh/SIMPApy/blob/main/images/3D_interactive_plot.png)
+![.](https://github.com/hasanalsharoh/SIMPApy/blob/main/images/3D_interactive_plot.png?raw=true)
 
 In the figure, each dot is a single gene in a single sample. On hovering each datapoint, the following data is shown:
             

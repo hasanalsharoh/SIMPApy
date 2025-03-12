@@ -6,7 +6,7 @@ import tempfile
 import shutil
 from unittest.mock import patch, MagicMock
 
-from SIMPApy.core import sopa, sopa_population, load_sopa
+from SIMPApy.core import _sopa, sopa, load_sopa
 
 class TestSopaFunctions(unittest.TestCase):
     
@@ -46,7 +46,7 @@ class TestSopaFunctions(unittest.TestCase):
         mock_prerank.return_value = mock_result
         
         # Call sopa function
-        result = sopa(self.ranking, self.gene_sets)
+        result = _sopa(self.ranking, self.gene_sets)
         
         # Assert that prerank was called with the correct parameters
         mock_prerank.assert_called_once()
@@ -61,7 +61,7 @@ class TestSopaFunctions(unittest.TestCase):
         self.assertIn('fdr', result.columns)
         self.assertTrue((result['fdr'] == [0.01, 0.05]).all() or (result['fdr'] == [0.05, 0.01]).all())
     
-    @patch('SIMPApy.core.sopa')
+    @patch('SIMPApy.core._sopa')
     def test_sopa_population(self, mock_sopa):
         # Create a sample ranks DataFrame
         ranks = pd.DataFrame({
@@ -85,7 +85,7 @@ class TestSopaFunctions(unittest.TestCase):
         
         # Call sopa_population
         output_dir = os.path.join(self.test_dir, 'sopa_results')
-        sopa_population(ranks, self.gene_sets, output_dir)
+        sopa(ranks, self.gene_sets, output_dir)
         
         # Assert directory was created
         self.assertTrue(os.path.exists(output_dir))

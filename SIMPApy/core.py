@@ -12,7 +12,7 @@ import glob
 from typing import Dict, List, Union, Optional, Tuple
 
 
-def sopa(
+def _sopa(
     ranking: pd.Series,
     gene_set: Union[Dict, str],
     minisz: int = 3,
@@ -68,7 +68,7 @@ def sopa(
     return out_df
 
 
-def sopa_population(
+def sopa(
     ranks: pd.DataFrame,
     gene_set: Union[Dict, str],
     output_dir: str,
@@ -99,7 +99,7 @@ def sopa_population(
         ranking = ranks[col].replace([np.inf, -np.inf], np.nan).dropna().sort_values(ascending=False)
                 
         # Run sopa with all the parameters
-        gsea_result = sopa(
+        gsea_result = _sopa(
             ranking=ranking,
             gene_set=gene_set,
             minisz=minisz,

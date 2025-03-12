@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import unittest
 from unittest.mock import patch, mock_open, MagicMock, Mock, call
-from SIMPApy.SIMPA import simpa, calculate_wcos_mpes, sort_gene_list, run_simpa_batch, load_simpa
+from SIMPApy.SIMPA import _simpa, calculate_wcos_mpes, sort_gene_list, simpa, load_simpa
 import glob
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def test_simpa_successful_integration(mock_rna_data, mock_cnv_data, mock_dna_dat
         mock_read_csv.side_effect = [mock_rna_data, mock_cnv_data, mock_dna_data]
         
         # Run simpa function
-        result = simpa(
+        result = _simpa(
             sample_id='test_sample',
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -70,7 +70,7 @@ def test_simpa_missing_file():
     with patch('pandas.read_csv') as mock_read_csv:
         mock_read_csv.side_effect = FileNotFoundError
         
-        result = simpa(
+        result = _simpa(
             sample_id='missing_sample',
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -84,7 +84,7 @@ def test_simpa_empty_file():
     with patch('pandas.read_csv') as mock_read_csv:
         mock_read_csv.side_effect = pd.errors.EmptyDataError
         
-        result = simpa(
+        result = _simpa(
             sample_id='empty_sample',
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -101,7 +101,7 @@ def test_simpa_output_file(mock_rna_data, mock_cnv_data, mock_dna_data):
         
         mock_read_csv.side_effect = [mock_rna_data, mock_cnv_data, mock_dna_data]
         
-        simpa(
+        _simpa(
             sample_id='test_sample',
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -118,7 +118,7 @@ def test_simpa_calculation_correctness(mock_rna_data, mock_cnv_data, mock_dna_da
     with patch('pandas.read_csv') as mock_read_csv:
         mock_read_csv.side_effect = [mock_rna_data, mock_cnv_data, mock_dna_data]
         
-        result = simpa(
+        result = _simpa(
             sample_id='test_sample',
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -204,10 +204,10 @@ def test_run_simpa_batch_successful_execution(mock_simpa_result):
     sample_ids = ['sample1', 'sample2', 'sample3']
     
     with patch('os.makedirs') as mock_makedirs, \
-         patch('SIMPApy.SIMPA.simpa', return_value=mock_simpa_result) as mock_simpa, \
+         patch('SIMPApy.SIMPA._simpa', return_value=mock_simpa_result) as mock_simpa, \
          patch('pandas.DataFrame.to_csv') as mock_to_csv:
         
-        run_simpa_batch(
+        simpa(
             sample_ids=sample_ids,
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',
@@ -240,10 +240,10 @@ def test_run_simpa_batch_with_failed_sample(mock_simpa_result):
         return mock_simpa_result
     
     with patch('os.makedirs') as mock_makedirs, \
-         patch('SIMPApy.SIMPA.simpa', side_effect=side_effect) as mock_simpa, \
+         patch('SIMPApy.SIMPA._simpa', side_effect=side_effect) as mock_simpa, \
          patch('pandas.DataFrame.to_csv') as mock_to_csv:
         
-        run_simpa_batch(
+        simpa(
             sample_ids=sample_ids,
             rna_dir='/fake/rna',
             cnv_dir='/fake/cnv',

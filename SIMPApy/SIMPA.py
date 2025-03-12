@@ -74,7 +74,7 @@ def sort_gene_list(gene_str: str) -> str:
     return ';'.join(sorted(genes))
 
 
-def simpa(
+def _simpa(
     sample_id: str, 
     rna_dir: str, 
     cnv_dir: str, 
@@ -193,7 +193,7 @@ def simpa(
     return combined
 
 
-def run_simpa_batch(
+def simpa(
     sample_ids: List[str],
     rna_dir: str,
     cnv_dir: str,
@@ -216,7 +216,7 @@ def run_simpa_batch(
     os.makedirs(output_dir, exist_ok=True)
     
     for sample_id in sample_ids:
-        combined_df = simpa(sample_id, rna_dir, cnv_dir, dna_dir)
+        combined_df = _simpa(sample_id, rna_dir, cnv_dir, dna_dir)
         
         if combined_df is not None:
             output_file = os.path.join(output_dir, f'{sample_id}_integrated_gsea_results.csv')
