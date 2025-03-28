@@ -17,7 +17,7 @@ from .SIMPA import _simpa, simpa, load_simpa
 from .preprocess import _extract_tag_genes, _create_aggregated_dataframes, process_multiomics_data
 from .visualize import _create_traces, create_interactive_plot
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __all__ = [
     "calculate_ranking",
     "sopa",

@@ -10,7 +10,7 @@ import numpy as np
 import os
 import glob
 from typing import Dict, List, Union, Optional, Tuple
-
+import logging # Import the logging library
 
 def _sopa(
     ranking: pd.Series,
@@ -116,7 +116,10 @@ def sopa(
         # Clean up
         del gsea_result, ranking
 
-def load_sopa(directory):
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+def load_sopa(directory: str) -> pd.DataFrame:
     """
     Loads and processes sopa results from a directory of CSV files.
 
@@ -125,38 +128,60 @@ def load_sopa(directory):
 
     Returns:
         A pandas DataFrame with columns: sample_name, term, fdr, pval.
+        Returns an empty DataFrame if no valid files are found or processed.
     """
 
     all_results = []
+    required_columns = ['Term', 'fdr', 'es', 'nes', 'matched_genes', 'gene %', 'tag %', 'lead_genes']
 
-    # Use glob to find all CSV files matching the pattern
-    file_pattern = os.path.join(directory, "tm*_gsea_results.csv")
-    file_paths = glob.glob(file_pattern)
-    
-    # also get tw files
-    file_pattern = os.path.join(directory, "tw*_gsea_results.csv")
-    file_paths.extend(glob.glob(file_pattern))
+    # Use glob to find all CSV files matching the patterns
+    file_pattern_tm = os.path.join(directory, "tm*_gsea_results.csv")
+    file_pattern_tw = os.path.join(directory, "tw*_gsea_results.csv")
+    file_paths = glob.glob(file_pattern_tm) + glob.glob(file_pattern_tw) # Combine lists directly
+
+    if not file_paths:
+        logging.warning(f"No files matching 'tm*_gsea_results.csv' or 'tw*_gsea_results.csv' found in directory: {directory}")
+        return pd.DataFrame(columns=['sample_name'] + required_columns) # Return empty DataFrame with expected columns
 
     for file_path in file_paths:
         # Extract sample name from filename
         file_name = os.path.basename(file_path)
         sample_name = file_name.split("_gsea_results")[0]  # Extract tm(n) or tw(n)
 
-        # Load the CSV file into a DataFrame
         try:
+            # Load the CSV file into a DataFrame
             df = pd.read_csv(file_path)
+
+            # Check for and select required columns
+            try:
+                df_selected = df[required_columns].copy() # Use .copy() to avoid SettingWithCopyWarning
+                df_selected['sample_name'] = sample_name
+                all_results.append(df_selected)
+            except KeyError as e:
+                # Handle missing columns after successful parsing
+                missing_cols = list(set(required_columns) - set(df.columns))
+                logging.error(f"Error: File {file_path} is missing required columns: {missing_cols}. Skipping.")
+                continue # Skip this file
+
         except pd.errors.ParserError:
-            print(f"Error: Could not parse {file_path} as a CSV file. Skipping.")
+            # Handle files that cannot be parsed as CSV
+            logging.error(f"Error: Could not parse {file_path} as a CSV file. Skipping.")
             continue
+        except FileNotFoundError:
+            # Handle case where file disappears between glob and read_csv (unlikely but possible)
+            logging.error(f"Error: File {file_path} not found. Skipping.")
+            continue
+        except Exception as e:
+             # Catch any other unexpected errors during file processing
+             logging.error(f"An unexpected error occurred processing {file_path}: {e}. Skipping.")
+             continue
 
-        # Select relevant columns and add sample name
-        df = df[['Term', 'fdr', 'es','nes','matched_genes','gene %','tag %','lead_genes']]
-        df['sample_name'] = sample_name
-
-        # Append to the list of results
-        all_results.append(df)
 
     # Concatenate all results into a single DataFrame
+    if not all_results:
+        logging.warning(f"No valid SOPA result files were processed successfully in directory: {directory}")
+        return pd.DataFrame(columns=['sample_name'] + required_columns) # Return empty DataFrame if no files were valid
+
     final_df = pd.concat(all_results, ignore_index=True)
 
     return final_df

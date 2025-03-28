@@ -4,7 +4,8 @@ import numpy as np
 import os
 import tempfile
 import shutil
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call # Import call for checking call args later if needed
+import logging
 
 from SIMPApy.core import _sopa, sopa, load_sopa
 
@@ -99,71 +100,122 @@ class TestSopaFunctions(unittest.TestCase):
     
     def test_load_sopa(self):
         # Create mock result files
-        os.makedirs(os.path.join(self.test_dir, 'results'), exist_ok=True)
-        
-        # Create mock result CSV files
+        results_dir = os.path.join(self.test_dir, 'results_valid')
+        os.makedirs(results_dir, exist_ok=True)
+
+        # --- Mock data as before ---
         sample1_df = pd.DataFrame({
-            'Term': ['pathway1', 'pathway2'],
-            'fdr': [0.01, 0.05],
-            'es': [0.5, 0.3],
-            'nes': [0.6, 0.4],
-            'pval': [0.005, 0.03],
-            'matched_genes': [3, 2],
-            'gene %': [30, 20],
-            'lead_genes': ['gene1', 'gene2'],
-            'tag %': [70, 60]
+            'Term': ['pathway1', 'pathway2'], 'fdr': [0.01, 0.05], 'es': [0.5, 0.3],
+            'nes': [0.6, 0.4], 'pval': [0.005, 0.03], 'matched_genes': [3, 2],
+            'gene %': [30, 20], 'lead_genes': ['gene1', 'gene2'], 'tag %': [70, 60]
         })
-        
         sample2_df = pd.DataFrame({
-            'Term': ['pathway1', 'pathway3'],
-            'fdr': [0.02, 0.04],
-            'es': [0.4, 0.3],
-            'nes': [0.5, 0.4],
-            'pval': [0.01, 0.02],
-            'matched_genes': [2, 3],
-            'gene %': [20, 30],
-            'lead_genes': ['gene2', 'gene3'],
-            'tag %': [60, 70]
+            'Term': ['pathway1', 'pathway3'], 'fdr': [0.02, 0.04], 'es': [0.4, 0.3],
+            'nes': [0.5, 0.4], 'pval': [0.01, 0.02], 'matched_genes': [2, 3],
+            'gene %': [20, 30], 'lead_genes': ['gene2', 'gene3'], 'tag %': [60, 70]
         })
-        
+
         # Save mock result files
-        sample1_df.to_csv(os.path.join(self.test_dir, 'results', 'tm1_gsea_results.csv'), index=False)
-        sample2_df.to_csv(os.path.join(self.test_dir, 'results', 'tw1_gsea_results.csv'), index=False)
-        
+        sample1_df.to_csv(os.path.join(results_dir, 'tm1_gsea_results.csv'), index=False)
+        sample2_df.to_csv(os.path.join(results_dir, 'tw1_gsea_results.csv'), index=False)
+
         # Call load_sopa
-        results = load_sopa(os.path.join(self.test_dir, 'results'))
-        
+        results = load_sopa(results_dir)
+
         # Assert results structure
         self.assertIsInstance(results, pd.DataFrame)
         self.assertEqual(len(results), 4)  # 2 pathways × 2 samples
         self.assertIn('sample_name', results.columns)
         self.assertIn('Term', results.columns)
         self.assertIn('fdr', results.columns)
-        
+        self.assertIn('es', results.columns) # Check a few more expected cols
+        self.assertIn('lead_genes', results.columns)
+
         # Assert sample names are correctly extracted
-        self.assertTrue('tm1' in results['sample_name'].values)
-        self.assertTrue('tw1' in results['sample_name'].values)
-    
+        self.assertListEqual(sorted(results['sample_name'].unique()), ['tm1', 'tw1'])
+
+
     @unittest.expectedFailure
-    def test_load_sopa_with_invalid_file(self):
-        # Create directory with an invalid CSV file
-        os.makedirs(os.path.join(self.test_dir, 'invalid'), exist_ok=True)
-        
-        # Create a valid file
-        pd.DataFrame({'Term': ['pathway1']}).to_csv(
-            os.path.join(self.test_dir, 'invalid', 'tm1_gsea_results.csv'), index=False
+    def test_load_sopa_with_invalid_files(self): # Changed from test_load_sopa_invalid_files for clarity
+        # Create directory
+        invalid_dir = os.path.join(self.test_dir, 'invalid')
+        os.makedirs(invalid_dir, exist_ok=True)
+
+        # Create a VALID file with all required columns
+        valid_data = {
+            'Term': ['pathwayA'], 'fdr': [0.1], 'es': [0.2], 'nes': [0.3],
+            'pval': [0.05], 'matched_genes': [5], 'gene %': [10],
+            'lead_genes': ['geneX'], 'tag %': [50]
+        }
+        pd.DataFrame(valid_data).to_csv(
+            os.path.join(invalid_dir, 'tm1_gsea_results.csv'), index=False
         )
-        
-        # Create an invalid file
-        with open(os.path.join(self.test_dir, 'invalid', 'tm2_gsea_results.csv'), 'w') as f:
-            f.write('This is not a valid CSV file"""""')
-        
-        # Test that it handles the error gracefully
-        results = load_sopa(os.path.join(self.test_dir, 'invalid'))
-        
-        # Only the valid file should be processed
-        self.assertEqual(len(results), 1)
+
+        # Create an INVALID (unparseable) file
+        with open(os.path.join(invalid_dir, 'tm2_gsea_results.csv'), 'w') as f:
+            f.write('This is not a valid CSV file, header\nvalue1, value2"""\'')
+
+        # Create a file that IS parseable but MISSING required columns
+        missing_col_data = {
+            'Term': ['pathwayB'], 'fdr': [0.2], #'es': [0.4], # Missing 'es'
+            'nes': [0.5], 'pval': [0.08], 'matched_genes': [6], 'gene %': [12],
+            'lead_genes': ['geneY'], 'tag %': [60]
+        }
+        pd.DataFrame(missing_col_data).to_csv(
+            os.path.join(invalid_dir, 'tw1_gsea_results.csv'), index=False
+        )
+
+        # Create an EMPTY file (should also be handled)
+        open(os.path.join(invalid_dir, 'tm3_gsea_results.csv'), 'w').close()
+        # Note: pandas might parse an empty file as empty DataFrame or raise EmptyDataError
+
+        # Suppress logging messages during test if desired
+        logging.disable(logging.ERROR)
+
+        # Test that it handles the errors gracefully
+        results = load_sopa(invalid_dir)
+
+        # Re-enable logging
+        logging.disable(logging.NOTSET)
+
+        # Only the fully valid file should be processed
+        self.assertIsInstance(results, pd.DataFrame)
+        self.assertEqual(len(results), 1, "Only the valid file 'tm1' should be loaded.")
         self.assertEqual(results['sample_name'].iloc[0], 'tm1')
+        self.assertEqual(results['Term'].iloc[0], 'pathwayA')
+        # Check that all required columns are present in the output
+        expected_cols = ['sample_name', 'Term', 'fdr', 'es', 'nes', 'matched_genes', 'gene %', 'tag %', 'lead_genes']
+        self.assertListEqual(list(results.columns), expected_cols)
+
+    def test_load_sopa_no_matching_files(self):
+        """Test behavior when no matching CSV files are found."""
+        empty_dir = os.path.join(self.test_dir, 'empty_dir')
+        os.makedirs(empty_dir, exist_ok=True)
+
+        # Suppress logging warnings for this test
+        logging.disable(logging.WARNING)
+        results = load_sopa(empty_dir)
+        logging.disable(logging.NOTSET)
+
+        self.assertIsInstance(results, pd.DataFrame)
+        self.assertTrue(results.empty)
+        # Check if columns are set correctly even when empty
+        expected_cols = ['sample_name', 'Term', 'fdr', 'es', 'nes', 'matched_genes', 'gene %', 'tag %', 'lead_genes']
+        self.assertListEqual(list(results.columns), expected_cols)
+
+    def test_load_sopa_directory_not_exist(self):
+        """Test behavior when the specified directory does not exist."""
+        non_existent_dir = os.path.join(self.test_dir, 'non_existent')
+
+        # Suppress logging warnings for this test
+        logging.disable(logging.WARNING)
+        results = load_sopa(non_existent_dir)
+        logging.disable(logging.NOTSET)
+
+        self.assertIsInstance(results, pd.DataFrame)
+        self.assertTrue(results.empty)
+        expected_cols = ['sample_name', 'Term', 'fdr', 'es', 'nes', 'matched_genes', 'gene %', 'tag %', 'lead_genes']
+        self.assertListEqual(list(results.columns), expected_cols)
 
 if __name__ == '__main__':
     unittest.main()
