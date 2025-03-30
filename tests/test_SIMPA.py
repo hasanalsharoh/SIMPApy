@@ -367,7 +367,6 @@ def test_load_simpa_with_parse_error():
         mock_print.assert_called_once_with(
             "Error: Could not parse /fake/results/tm2_integrated_gsea_results.csv as a CSV file. Skipping.")
 
-@unittest.expectedFailure
 def test_load_simpa_empty_directory_fixed():
     """Test load_simpa with an empty directory (fixed version)"""
     # Mock glob.glob to return empty lists (no files found)
