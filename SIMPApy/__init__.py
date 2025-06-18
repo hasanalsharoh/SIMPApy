@@ -16,8 +16,9 @@ from .ranking import calculate_ranking, _calculate_msd
 from .SIMPA import _simpa, simpa, load_simpa
 from .preprocess import _extract_tag_genes, _create_aggregated_dataframes, process_multiomics_data
 from .visualize import _create_traces, create_interactive_plot
+from .analyze import group_diffs, plot_volcano, calculate_correlation, plot_correlation_scatterplot
 
-__version__ = "0.1.2"
+__version__ = "0.1.4"
 __all__ = [
     "calculate_ranking",
     "sopa",
@@ -25,5 +26,9 @@ __all__ = [
     "simpa",
     "load_simpa",
     "process_multiomics_data",
-    "create_interactive_plot"
+    "create_interactive_plot",
+    "group_diffs",
+    "plot_volcano",
+    "calculate_correlation",
+    "plot_correlation_scatterplot"
 ]
