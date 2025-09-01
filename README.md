@@ -68,7 +68,7 @@ dnaranks_df = pd.concat({k: v['weighted'] for k, v in dnaranks.items()}, axis=1)
 ### CNV data
 Here, make sure to have copy number data. If GISTIC2 data is present (often through log(Copy_Number +1)), then conversion is usually done through 2**(GISTIC2_value -1)
 ```python
-cnvs = sp.calculate_ranking(cnv_data, omic = 'cnv'):
+cnranks = sp.calculate_ranking(cnv_data, omic = 'cnv'):
 # cnv_data: Pandas DataFrame with gene-level copy numbers. 
 # Rows are genes and columns are samples ('tm' for cases, 'tw' for controls).
 ```

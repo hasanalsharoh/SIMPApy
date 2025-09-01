@@ -12,9 +12,9 @@ from statsmodels.stats.multitest import multipletests
 
 def group_diffs(
     data: pd.DataFrame,
-    pathway_col: str,
-    value_col: str,
-    group_col: str,
+    pathway_col: str = 'Term',
+    value_col: str = 'nes',
+    group_col: str = 'sample_name',
     group1_prefix: str = 'tm',
     group2_prefix: str = 'tw',
     adj_method: str = 'fdr_bh',
@@ -84,43 +84,68 @@ def group_diffs(
     return results_df.sort_values('p_value').reset_index(drop=True)
 
 
-def plot_volcano(
-    data: pd.DataFrame,
-    x_col: str = 'mean_diff',
-    y_col: str = 'neg_log10_p_adj',
-    p_thresh: float = 0.05,
-    title: str = "Group Differences Volcano Plot",
-    xlabel: str = "Mean Difference",
-    ylabel: str = "-log10(Adjusted P-value)",
-    save_path: str = None
-) -> None:
+def plot_volcano(df, 
+                 pvalthresh=0.05, 
+                 mean_thresh=0.5, 
+                 figsize=(6, 4), 
+                 fontsize=18, 
+                 labelsize=20, 
+                 out='volcano.png'):
     """
-    Generates and optionally saves a volcano plot from group difference results.
-
-    Args:
-        data (pd.DataFrame): DataFrame from group_diffs function.
-        x_col (str): Column for the x-axis (mean difference).
-        y_col (str): Column for the y-axis (-log10 adjusted p-value).
-        p_thresh (float): Significance threshold for p-value.
-        title (str): The title of the plot.
-        xlabel (str): The label for the x-axis.
-        ylabel (str): The label for the y-axis.
-        save_path (str): If provided, the plot is saved to this path.
+    Volcano plot that always displays all points and highlights:
+      - both significant by p_adj and mean_diff (both)
+      - only p_adj significant (p_only)
+      - only mean_diff large (mean_only)
+      - neither (none)
+    This prevents points "disappearing" when mean_thresh is set high.
     """
-    plt.figure(figsize=(10, 8))
-    sns.scatterplot(data=data, x=x_col, y=y_col, color='blue')
+    # thresholds
+    neg_log10_p_thresh = -np.log10(pvalthresh)
 
-    neg_log10_p_threshold = -np.log10(p_thresh)
-    plt.axhline(y=neg_log10_p_threshold, color='gray', linestyle='--')
+    sig_pval = df['p_adj'] < pvalthresh
+    sig_mean = df['mean_diff'].abs() > mean_thresh
 
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.grid(True)
+    both = sig_pval & sig_mean
+    p_only = sig_pval & ~sig_mean
+    mean_only = ~sig_pval & sig_mean
+    none = ~sig_pval & ~sig_mean
 
-    if save_path:
-        plt.savefig(save_path, dpi=300)
-    
+    plt.figure(figsize=figsize)
+
+    # plot all categories in order (background -> foreground)
+    plt.scatter(df.loc[none, 'mean_diff'], df.loc[none, 'neg_log10_p_adj'],
+                color='lightgrey', alpha=0.6, label='Not significant', s=40, zorder=1)
+    if mean_only.any():
+        plt.scatter(df.loc[mean_only, 'mean_diff'], df.loc[mean_only, 'neg_log10_p_adj'],
+                    color='grey', alpha=0.9, label=f'|mean| > {mean_thresh}', s=50, zorder=2)
+    if p_only.any():
+        plt.scatter(df.loc[p_only, 'mean_diff'], df.loc[p_only, 'neg_log10_p_adj'],
+                    color='grey', alpha=0.9, label=f'p_adj < {pvalthresh}', s=50, zorder=3)
+    if both.any():
+        plt.scatter(df.loc[both, 'mean_diff'], df.loc[both, 'neg_log10_p_adj'],
+                    color='blue', alpha=0.9, label='Both criteria', s=60, zorder=4)
+
+    # threshold lines
+    plt.axhline(y=neg_log10_p_thresh, color='gray', linestyle='--', lw=1)
+    plt.axvline(x=mean_thresh, color='gray', linestyle='--', lw=1)
+    plt.axvline(x=-mean_thresh, color='gray', linestyle='--', lw=1)
+
+    # axis labels and styling
+    plt.xlabel("Mean NES Difference (TMA - TWA)", fontsize=fontsize)
+    plt.ylabel("-log10(adjusted p-value)", fontsize=fontsize)
+    plt.tick_params(axis='both', labelsize=labelsize)
+    plt.grid(True, alpha=0.3)
+
+    # expand limits a bit so lines/points are not at the edge
+    xpad = (df['mean_diff'].max() - df['mean_diff'].min()) * 0.05
+    ypad = (df['neg_log10_p_adj'].max() - df['neg_log10_p_adj'].min()) * 0.05
+    if np.isfinite(xpad):
+        plt.xlim(df['mean_diff'].min() - max(0.1, xpad), df['mean_diff'].max() + max(0.1, xpad))
+    if np.isfinite(ypad):
+        plt.ylim(max(0, df['neg_log10_p_adj'].min() - max(0.1, ypad)), df['neg_log10_p_adj'].max() + max(0.1, ypad))
+
+    plt.tight_layout()
+    plt.savefig(out, dpi=300)
     plt.show()
 
 def calculate_correlation(data: pd.DataFrame, x_col: str, y_col: str, group_col: str = None) -> pd.DataFrame:

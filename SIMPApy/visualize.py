@@ -362,19 +362,26 @@ def create_interactive_plot(data, title_suffix=""):
         title=f"{title_suffix}",
         title_x=0.5,
         title_y=0.95,
+        title_font=dict(size=18),  # Optional: also increase title font
         scene=dict(
             xaxis=dict(
                 title='DNAm',
+                titlefont=dict(size=18),  # Axis title font size
+                tickfont=dict(size=18),   # Tick label font size
                 backgroundcolor="white",
                 gridcolor="grey"
             ),
             yaxis=dict(
                 title='TPM',
+                titlefont=dict(size=18),  # Axis title font size
+                tickfont=dict(size=18),   # Tick label font size
                 backgroundcolor="white",
                 gridcolor="grey"
             ),
             zaxis=dict(
                 title='CNV',
+                titlefont=dict(size=18),  # Axis title font size
+                tickfont=dict(size=18),   # Tick label font size
                 backgroundcolor="white",
                 gridcolor="grey"
             ),
