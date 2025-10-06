@@ -4,12 +4,12 @@ Normalized Single Sample Integrated Multi-Omics Pathway Analysis for Python
 
 ## Description
 
-`SIMPApy` is a Python package for performing Gene Set Enrichment Analysis (GSEA) on multiomics data in single samples and integrating the results. It supports RNA sequencing, DNA methylation, and copy number variation data types.
+`SIMPApy` is a Python package for performing Gene Set Enrichment Analysis (GSEA) on multiomics data in single samples and integrating the results. It supports RNA sequencing, DNA methylation, and copy number variation data types. This package uses the normalized single sample single --omic pathway analysis (SOPA) framework and integrates the results through normalized single sample integrated multiomics pathway analysis (SIMPA) extension.  
 
 ## Installation
 
 
-To install SIMPApy, create a new virtual environment (preferably also installing Jupyter Notebooks through anaconda). Afterwards, use:
+To install SIMPApy, create a new virtual environment (also installing Jupyter Notebooks through anaconda). Afterwards, use:
 ```bash
 pip install SIMPApy 
 ```
@@ -29,7 +29,7 @@ To use SOPA, we need raw data for a single -omic, and as follows:
     1. For RNAseq data: TPM, or normalized counts. FPKM, RPKM may work, but the tool was not validated on them.
     2. For CNV data: Copy numbers. Each gene must have its individual copy numbers.
     3. For DNAm data: Beta values. The values must be mapped to gene names rather than CpG sites.
-- The dataframes must contain sample divided into 2 groups, cases and controls. For the case group, each sample must start with the name 'tm', while for the control group, each sample must start with 'tw'.
+- The dataframes must contain samples divided into 2 groups, cases and controls. For the case group, each sample must start with the name 'tm', while for the control group, each sample must start with 'tw'.
 - It is possible to use more than 2 groups. For example:
         
         Assume 3 groups (group1, group2, group3). Analyses could be done between group1 and group2, and then group3 and group2, or group3 and group1, according to preference.
@@ -180,8 +180,13 @@ Figure settings allow the following:
     - Reset View (button): Restores the view to unfiltered.
     
     - Export (300DPI): This options exports the current view of the 3D box.
-            
-## Requirements
+
+## Downstream analysis
+This package also offers direct analysis of results obtained with both SOPA and SIMPA through the .analyze module. 
+Please consult the module's documentation for further instructions.
+
+
+# Requirements
 
 - Python ≥ 3.8
 - gseapy==1.1.3

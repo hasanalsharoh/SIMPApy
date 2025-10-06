@@ -101,39 +101,71 @@ def calculate_ranking(
             # Store the DataFrame in the dictionary
             ranked_dfs[sample] = sample_df
 
-            # Delete the DataFrame to free up memory (optional)
             del sample_df
 
         return ranked_dfs
     
     elif omic.upper() == "CNV":
-        # Calculate baseline importance (Bg) for each gene
-        control_data = df.filter(regex='^tw')  # Control data
-        control_std = control_data.std(axis=1)
-        control_max = control_data.max(axis=1)
-        Bg = control_std / control_max
 
-        # Create a dictionary to store results
-        adjusted_weights_dict = {}
+        control_data = df.filter(regex='^tw')
+        N = len(control_data.columns)
+        epsilon = 0.01 # Small constant to prevent division by zero
 
-        # Loop through all samples (cases and controls)
+        # Pre-compute all necessary stats for the control group
+        control_counts_df = control_data.apply(pd.Series.value_counts, axis=1).fillna(0).astype(int)
+        mu_controls = control_data.mean(axis=1)
+        sigma_controls = control_data.std(axis=1)
+
+        ranked_dfs = {}
+
+        # 2. Loop through all samples
         for sample_name in df.columns:
-            x_s = df[sample_name]  # Copy numbers for the current sample
+            sample_series = df[sample_name]
+            scores = []
 
-            # Calculate non-linear weight (w(x_s,g))
-            w_x_s_g = 2 ** np.abs(x_s - 2) * np.sign(x_s - 2)
+            # Loop through each gene in the current sample
+            for gene, cn_value in sample_series.items():
+                
+                if cn_value != 2:
+                    
+                    # Look up k: number of controls with the same CN value
+                    k = control_counts_df.loc[gene, cn_value] if cn_value in control_counts_df.columns else 0
+                    
+                    # Construct 2x2 table cells for a stable Odds Ratio calculation
+                    a, b = 1.5, 0.5
+                    c, d = k + 0.5, (N - k) + 0.5
+                    
+                    # Calculate the corrected odds ratio
+                    or_corrected = (a * d) / (b * c)
+                    
+                    # Handle edge case for log transform if OR is somehow non-positive
+                    if or_corrected <= 0:
+                        or_corrected = epsilon
+                        
+                    # Look up the pre-computed standard deviation for the gene
+                    sigma_for_gene = sigma_controls.loc[gene]
+                    
+                    # Calculate the final score using the enhanced formula
+                    score = (np.sign(cn_value - 2) * np.log10(or_corrected)) / (sigma_for_gene + epsilon)
 
-            # Calculate adjusted weight (w_adjusted(x_s,g))
-            adjusted_weight = w_x_s_g.where(w_x_s_g != 0, Bg)
+                else: # cn_value == 2
+                    
+                    # Look up pre-computed mean and std dev for the gene
+                    mu_for_gene = mu_controls.loc[gene]
+                    sigma_for_gene = sigma_controls.loc[gene]
+                    
+                    # Calculate the Z-score relative to the control mean to capture nuance
+                    score = (2 - mu_for_gene) / (sigma_for_gene + epsilon)
+                
+                scores.append(score)
 
-            # Create a DataFrame for the current sample
-            df_sample = pd.DataFrame({
-                'adjusted_weight': adjusted_weight
-            })
-
-            adjusted_weights_dict[sample_name] = df_sample
-
-        return adjusted_weights_dict
+            df_sample = pd.DataFrame(
+                {'adjusted_weight': scores},
+                index=df.index
+            )
+            ranked_dfs[sample_name] = df_sample
+            
+        return ranked_dfs
     
     else:
         raise ValueError("Omic type must be 'RNA', 'DNAm', or 'CNV'")
