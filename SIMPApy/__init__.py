@@ -10,6 +10,9 @@ The package includes the following modules:
 - ranking: Contains functions for calculating ranking and mean signed deviation.
 - simpa: Contains the main functions for running SIMPA.
 - visualize: Contains functions for creating interactive plots of from SIMPA results.
+- preprocess: Contains functions for preprocessing multi-omics data and creating aggregated dataframes for SIMPA module.
+- analyze: Contains functions for analyzing SIMPA results, including calculating group differences, plotting volcano plots,
+ and calculating and plotting correlations between omics layers.
 """
 from .core import _sopa, sopa, load_sopa
 from .ranking import calculate_ranking, _calculate_msd
@@ -18,7 +21,7 @@ from .preprocess import _extract_tag_genes, _create_aggregated_dataframes, proce
 from .visualize import _create_traces, create_interactive_plot
 from .analyze import group_diffs, plot_volcano, calculate_correlation, plot_correlation_scatterplot
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __all__ = [
     "calculate_ranking",
     "sopa",
