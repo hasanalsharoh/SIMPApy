@@ -93,16 +93,14 @@ class TestCalculateRanking(unittest.TestCase):
         with self.assertRaises(ValueError):
             calculate_ranking(self.rna_data, omic="invalid_type")
 
-    @unittest.expectedFailure
     def test_empty_dataframe(self):
         """Test with empty dataframe"""
         empty_df = pd.DataFrame()
         with self.assertRaises(Exception):  # Some exception should be raised
             calculate_ranking(empty_df)
 
-    @unittest.expectedFailure
     def test_single_sample(self):
-        """Test with single sample (should fail as control samples are needed)"""
+        """Test with single sample (less than 3 is not enough for ranking)"""
         single_sample = pd.DataFrame({'case1': [10, 20, 30]}, 
                                     index=['gene1', 'gene2', 'gene3'])
         with self.assertRaises(Exception):  # Should fail without control samples

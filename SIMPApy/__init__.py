@@ -15,13 +15,13 @@ The package includes the following modules:
  and calculating and plotting correlations between omics layers.
 """
 from .core import _sopa, sopa, load_sopa
-from .ranking import calculate_ranking, _calculate_msd
+from .ranking import calculate_ranking, _calculate_msd, _calculate_msd_robust
 from .SIMPA import _simpa, simpa, load_simpa
 from .preprocess import _extract_tag_genes, _create_aggregated_dataframes, process_multiomics_data
 from .visualize import _create_traces, create_interactive_plot
 from .analyze import group_diffs, plot_volcano, calculate_correlation, plot_correlation_scatterplot
 
-__version__ = "0.3.3"
+__version__ = "1.1.2"
 __all__ = [
     "calculate_ranking",
     "sopa",
