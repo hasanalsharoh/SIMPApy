@@ -21,7 +21,7 @@ from .preprocess import _extract_tag_genes, _create_aggregated_dataframes, proce
 from .visualize import _create_traces, create_interactive_plot
 from .analyze import group_diffs, plot_volcano, calculate_correlation, plot_correlation_scatterplot
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 __all__ = [
     "calculate_ranking",
     "sopa",

@@ -17,8 +17,9 @@ from typing import Dict, List, Union, Optional, Tuple, Any
 
 def calculate_wcos_mpes(row: pd.Series) -> pd.Series:
     """
-    Calculates Weighted Combined Omics Score (WCOS) and Multiomics Pathway Enrichment Score (MPES) 
+    Calculates Weighted-omic Contribution Score (WOCS) and Multiomics Pathway Enrichment Score (MPES) 
     for a single pathway across multiple omics platforms.
+    wcos is a misnomer for the original formula, and future iterations will correct this to match the original manuscript's formula.
     
     Args:
         row: A pandas Series containing GSEA results for a pathway across omics types.

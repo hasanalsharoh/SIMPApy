@@ -1,11 +1,15 @@
 # Changelog and Todo
 
 ## Changelog
+#### 07.08.2026 - v1.1.3
+1. Updated docstrings to accurately detail future iterations.
+2. Updated README.md to remove requirements, which are exclusively now found in requirements.txt and pyproject.toml
+
 #### 22.04.2026 - v1.1.2
 1. Upgraded pillow to 12.2.0 to resolve security vulnerabilites.
 2. Fix expected failures in unit tests
 3. Bumped version to 1.1.2, which includes a breaking change ($MSD_{D_{x,s}}$ for RNAseq and DNAm is now not the default metric).
-4. Added $MSD_{D_{x,s}^{robust}} as the default ranking metric for RNAseq and DNAm data types.
+4. Added robust non-parametric $MSD_{D_{x,s}} as the default ranking metric for RNAseq and DNAm data types.
 
 #### 02.04.2026
 1. Upgraded pillow to resolve security vulnerabilities.
@@ -19,6 +23,14 @@
 
 
 ## Todo
+#### 07.08.2026
+1. Update MPES functions to return WOCS instead of WCOS to mirror the article.
+2. Remove parametric $MSD_{D_{x,s}}$ in future iterations.
+3. Add wrapped functions for GMM clustering
+4. Update output file names from SOPA and SIMPA.
+5. Create readthedocs for thorough documentation.
+6. Implement parallelization features to improve speed.
+
 #### 22.04.2026
 1. Include OLS for single sample single gene ranking.
 

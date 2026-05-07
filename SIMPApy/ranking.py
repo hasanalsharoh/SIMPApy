@@ -14,6 +14,9 @@ from typing import Dict, List, Union, Optional, Tuple
 def _calculate_msd(df: pd.DataFrame, alpha: float = 0.05) -> pd.Series:
     """
     Calculates the Minimum Significant Difference (MSD) for each gene in the dataframe.
+    'legacy' parametric approach using mean and standard deviation of the TWA group.
+    Note: This method assumes normality and is sensitive to outliers, so the robust version is generally recommended for real data.
+    This function will be retained for backward compatibility and will be retired in a future release.
 
     Args:
         df: pandas DataFrame with gene expression data.
@@ -137,7 +140,7 @@ def calculate_ranking(
         to handle skewed baseline distributions.
         (asymetric and robust are highly recommended together and are the default)
         Using assymetric and robust together is preferred for non parametric data, and is the more conservative approach.
-        Having both false is the classical parametric approach which may be more powerful if assumptions are met, but is more sensitive to outliers and non-normality.
+        Having both false is the legacy parametric approach, and will be retired in a future release.
     """
     if omic.upper() in ["RNA", "DNAM"]:
         twa_cols = [c for c in df.columns if c.startswith('tw')]

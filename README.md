@@ -1,6 +1,6 @@
 # SIMPApy
 
-Normalized Single Sample Integrated Multi-Omics Pathway Analysis for Python
+Single Sample Integrated Multi-Omics Pathway Analysis for Python
 
 ## Description
 
@@ -20,6 +20,8 @@ pip install SIMPApy
 - Calculate normalized single sample gene rankings for different omics data types (RNA-seq, DNA methylation, CNV).
 - Integrate GSEA results from multiple omics platforms in control-normalized single samples (SIMPA).
 - Calculate Multiomics Pathway Enrichment Score (MPES) for analysis of differentially activated pathways.
+- Plot the results for hypothesis-generation.
+- Outputs are immediately saved to directories to avoid memory limitations.
 
 ## Usage
 
@@ -41,7 +43,8 @@ import SIMPApy as sp
 import pandas as pd
 
 # Load example data found in data directory
-rna_data = pd.read_csv("rna.csv", index_col=0)
+rna_data_unprocessed = pd.read_csv("rna.csv", index_col=0)
+rna_data = np.log2(rna_data_unprocessed + 1) # log2(TPM+1) data
 cnv_data = pd.read_csv("cn.csv", index_col=0)
 dna_data = pd.read_csv("dna.csv", index_col=0) # M-values
 meth_data = pd.read_csv("meth.csv", index_col=0) # beta values
@@ -52,10 +55,15 @@ hallmark = "path/to/h.all.v2023.1.Hs.symbols.gmt" # hallmarks gene set
 ## Single sample gene ranking
 ### RNAseq and DNAm M-values
 ```python
-rnaranks = sp.calculate_ranking(df= rna, omic='rna', alpha=0.05)
+# input for all ranking functions should contain genes as rows, all samples (cases and controls) as columns
+# Case/intervention group c
+# for RNAseq
+rnaranks = sp.calculate_ranking(df= rna_data, omic='rna', alpha=0.05)
+# in the article, nonparametric MSD was used (function defaults)
 
 # for DNAm
-dnaranks = sp.calculate_ranking(df= dna, omic='dnam', alpha=0.05)
+dnaranks = sp.calculate_ranking(df= dna_data, omic='dnam', alpha=0.05)
+
 # assuming the following:
 # df: pandas DataFrame with gene expression data (genes as rows, samples as columns).
 ```
@@ -71,6 +79,7 @@ Here, make sure to have copy number data. If GISTIC2 data is present (often thro
 cnranks = sp.calculate_ranking(cnv_data, omic = 'cnv'):
 # cnv_data: Pandas DataFrame with gene-level copy numbers. 
 # Rows are genes and columns are samples ('tm' for cases, 'tw' for controls).
+# Make sure input is integers, floats may have unpredictable behavior.
 ```
 Afterwards, retrieve the dataframe:
 ```python
@@ -85,7 +94,9 @@ To run SOPA, we need 2 available files:
 
 multiple samples must be available in the single sample ranking dataframe, each column must be a sample name with gene names as rows. Gene names must be ENSEMBL IDs. We could run SOPA:
 ```python
-single_samples_output = sp.sopa(ranking_dataframe, gene_set_gmt_file, folder_to_contain_outputs_for_single_sample_enrichment_analysis)
+single_samples_output = sp.sopa(ranking_dataframe, # such as rnaranks_df 
+                                gene_set_gmt_file, # # such as hallmark
+                                folder_to_contain_outputs_for_single_sample_enrichment_analysis)
 ```
 ## SIMPA
 To run SIMPA, we need to have RNAseq, CNV, and DNA methylation SOPA results in 3 different folders.
@@ -121,9 +132,9 @@ Then, we retrieve 2 datasets, one for cases (TMAs here) and one for controls (TW
 
 ```python
 tmas, twas = sp.process_multiomics_data(simpa_res, # SIMPA results
-                                            rna, # TPM values
-                                             cn, # copy numbers
-                                             dna, # beta values
+                                            rna_data_unprocessed, # TPM values
+                                             cnv_data, # copy numbers
+                                             meth_data, # beta values
                                              pop_info) # for samples clinical information
 ```
 Afterwards, we could use:
@@ -184,25 +195,6 @@ Figure settings allow the following:
 ## Downstream analysis
 This package also offers direct analysis of results obtained with both SOPA and SIMPA through the .analyze module. 
 Please consult the module's documentation for further instructions.
-
-
-# Requirements
-
-- Python ≥ 3.8
-- gseapy==1.1.3
-- numpy==1.23.5
-- scipy==1.14.0
-- pandas==2.2.2
-- pydeseq2==0.4.10
-- matplotlib==3.9.2
-- plotly==5.24.1
-- scikit-learn==1.5.1
-- seaborn==0.13.2
-- statsmodels==0.14.1
-- ipywidgets==8.1.5
-- pillow==12.2.0
-- kaleido==0.1.0.post1
-
 
 ## License
 
