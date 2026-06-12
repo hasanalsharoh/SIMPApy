@@ -227,16 +227,16 @@ def create_interactive_plot(data, title_suffix=""):
                 print("Saving file...")
                 import os
                 # Create a more flexible file path approach
-                desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-                file_path = os.path.join(desktop_path, f"{title_suffix}.png")
-                static_fig.write_image(file_path, scale=1, width=width_px, height=height_px)
-                print(f"Successfully exported high-resolution image as '{file_path}'")
+                static_fig.write_image(f"{title_suffix}.png", scale=1, width=width_px, height=height_px)
+                print(f"Successfully exported high-resolution image as '{title_suffix}.png'")
             except Exception as e:
                 print(f"Error during export: {str(e)}")
                 print("\nFull traceback:")
                 traceback.print_exc()
                 print("\nPlease ensure you have installed required packages:")
                 print("pip install kaleido plotly -U")
+                print("For linux, kaleido==0.1.0 is recommended through pip git installation")
+                print("For Windows, kaleido==0.1.0.post1 can be installed via pip git as well")
 
     def update_plot():
         new_trace, filtered_data = _create_traces(

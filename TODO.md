@@ -1,6 +1,15 @@
 # Changelog and Todo
 
 ## Changelog
+#### 27.05.2026 - v1.2.2a
+1. Unstable version with parallelization working on testing environment in Linux (Ubuntu v22.04). $\newline$
+For a matrix of 9,142 genes x 1,968 samples, previous version on Windows took around 82-98 mins, current version takes approximately 16 mins.$\newline$
+$\space$    *NOTE*: `kaleido==0.1.0.post1` was found to be broken in Linux. Linux users should pip install the git version of `kaleido==0.1.0` instead.  
+2. `create_interactive_plot` in the `.visualize` module now no longer outputs image to desktop, and instead to local directory.
+3. Updated dependencies to more flexible versioning.
+4. `sopa` function in `.core` module is less verbose now by default.
+5. Improved error handling in `.core.load_sopa`.
+
 #### 07.08.2026 - v1.1.3
 1. Updated docstrings to accurately detail future iterations.
 2. Updated README.md to remove requirements, which are exclusively now found in requirements.txt and pyproject.toml
@@ -23,13 +32,18 @@
 
 
 ## Todo
+#### 26.05.2026
+1. Test parallelization on Windows, provide comparison metrics in speed and function.
+2. Test new functions to output static images from the `create_interactive_plot` function in the `.visualize` module.
+
+
 #### 07.08.2026
 1. Update MPES functions to return WOCS instead of WCOS to mirror the article.
 2. Remove parametric $MSD_{D_{x,s}}$ in future iterations.
 3. Add wrapped functions for GMM clustering
 4. Update output file names from SOPA and SIMPA.
 5. Create readthedocs for thorough documentation.
-6. Implement parallelization features to improve speed.
+~~6. Implement parallelization features to improve speed.~~
 
 #### 22.04.2026
 1. Include OLS for single sample single gene ranking.
@@ -47,4 +61,4 @@
 ~~3. Add additional functions for analysis of results obtained through SOPA and SIMPA~~
 4. Add single -omic FDR to SIMPA
 5. Add filtering based on defined FDR values in visualize module
-6. Introduce example for SIMPA with clinical data.
+~~6. Introduce example for SIMPA with clinical data.~~
