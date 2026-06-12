@@ -11,10 +11,27 @@ The SIMPApy package is actively maintained, and will receive further updates. Th
 
 ## Installation
 
-
 To install SIMPApy, create a new virtual environment (also installing Jupyter Notebooks through anaconda). Afterwards, use:
 ```bash
-pip install SIMPApy 
+pip install SIMPApy
+```
+
+### Static image export (optional)
+The interactive plot can export static PNGs via `kaleido`, which is an optional extra:
+```bash
+pip install "SIMPApy[export]"
+```
+> **Note:** `kaleido` is pinned `<1.0` because the 1.x rewrite requires `plotly>=6`, which
+> is incompatible with the pinned `plotly==5.24.1`. On Linux, `kaleido==0.1.0` is the
+> validated version (`kaleido==0.1.0.post1` is broken on Linux); on Windows,
+> `kaleido==0.1.0.post1` works.
+
+### Development install (uv)
+For development on Linux, this project uses [`uv`](https://docs.astral.sh/uv/) and a
+`src/` layout. An editable install resolves `SIMPApy` as a regular package (no
+`editable_mode=compat` workaround needed):
+```bash
+uv pip install -e ".[export]"   # or: uv sync
 ```
 
 ## Features
