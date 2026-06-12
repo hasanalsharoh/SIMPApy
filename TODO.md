@@ -1,7 +1,10 @@
 # Changelog and Todo
 
 ## Changelog
-#### 07.08.2026 - v1.1.3
+#### 12.06.2026 - v1.1.4
+1. Added citation information to README.md.
+
+#### 07.05.2026 - v1.1.3
 1. Updated docstrings to accurately detail future iterations.
 2. Updated README.md to remove requirements, which are exclusively now found in requirements.txt and pyproject.toml
 
