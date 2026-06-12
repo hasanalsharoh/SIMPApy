@@ -219,7 +219,7 @@ Please consult the module's documentation for further instructions.
 ## Citation
 If you found this python package helpful in your research, please consider citing the original publication.
 
-To reproduce the article (doi.org/10.1093/bib/bbag338), SIMPApy v1.1.3 was used in a Windows environment.
+To reproduce the article (doi.org/10.1093/bib/bbag338), SIMPApy v1.1.3 was used in a Windows environment. In future updates that were written in Linux, I found that the Linux kernel compiles the gseapy package differently from Windows. For SOPA, the results (tested only on RNAseq data) were slightly different from Windows environments in FDR and NES, but byte-for-byte identical for ES, since ES is deterministic. This is expected, and thus, to improve efficiency of the algorithm, I would only try to keep the algorithm identical for ES and not focus on the variations that would come from the random-walk in the gseapy engine. Additionally, version updates for gseapy will be added in future versions. Therefore, future iterations of SIMPApy may not produce exact results due to versioning differences.
 
 If SIMPApy helped you, please remember to cite the package through:
 
