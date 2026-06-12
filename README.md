@@ -6,6 +6,9 @@ Single Sample Integrated Multi-Omics Pathway Analysis for Python
 
 `SIMPApy` is a Python package for performing Gene Set Enrichment Analysis (GSEA) on multiomics data in single samples and integrating the results. It supports RNA sequencing, DNA methylation, and copy number variation data types. This package uses the normalized single sample single --omic pathway analysis (SOPA) framework and integrates the results through normalized single sample integrated multiomics pathway analysis (SIMPA) extension.  
 
+>[!NOTE]
+The SIMPApy package is actively maintained, and will receive further updates. The exact version used in the article is SIMPApy v1.1.3, which did not implement improved parallelization features optimized in Linux.
+
 ## Installation
 
 
@@ -195,6 +198,23 @@ Figure settings allow the following:
 ## Downstream analysis
 This package also offers direct analysis of results obtained with both SOPA and SIMPA through the .analyze module. 
 Please consult the module's documentation for further instructions.
+
+## Citation
+If you found this python package helpful in your research, please consider citing the original publication.
+
+To reproduce the article (doi.org/10.1093/bib/bbag338), SIMPApy v1.1.3 was used in a Windows environment.
+
+If SIMPApy helped you, please remember to cite the package through:
+
+```bibtex
+@article{Alsharoh2026,
+	author = {Alsharoh, H. and Ismaiel, A. and Calin G. and Pop O. and Berindan-Neagoe, I. and Bender, A.},
+	title = {SOPA and SIMPA: Normalized single sample integrated multiomics pathway analysis of tumor heterogeneity in solid cancers},
+	journal = {Briefings in Bioinformatics},
+	year = {2026},
+	doi = {10.1093/bib/bbag338}
+}
+```
 
 ## License
 

@@ -1,7 +1,7 @@
 # Changelog and Todo
 
 ## Changelog
-#### 27.05.2026 - v1.2.2a
+#### 12.06.2026 - v1.5.1a
 1. Unstable version with parallelization working on testing environment in Linux (Ubuntu v22.04). $\newline$
 For a matrix of 9,142 genes x 1,968 samples, previous version on Windows took around 82-98 mins, current version takes approximately 16 mins.$\newline$
 $\space$    *NOTE*: `kaleido==0.1.0.post1` was found to be broken in Linux. Linux users should pip install the git version of `kaleido==0.1.0` instead.  
@@ -9,8 +9,12 @@ $\space$    *NOTE*: `kaleido==0.1.0.post1` was found to be broken in Linux. Linu
 3. Updated dependencies to more flexible versioning.
 4. `sopa` function in `.core` module is less verbose now by default.
 5. Improved error handling in `.core.load_sopa`.
+6. Migrated to a `src/` layout with `uv` project management and the `hatchling` build backend.
 
-#### 07.08.2026 - v1.1.3
+#### 12.06.2026 - v1.1.4
+1. Added citation information to README.md.
+
+#### 07.05.2026 - v1.1.3
 1. Updated docstrings to accurately detail future iterations.
 2. Updated README.md to remove requirements, which are exclusively now found in requirements.txt and pyproject.toml
 
