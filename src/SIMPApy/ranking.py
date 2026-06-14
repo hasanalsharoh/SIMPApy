@@ -5,6 +5,8 @@ This module contains functions to calculate rankings for RNA-seq, DNA methylatio
 and copy number variation data.
 """
 
+import warnings
+
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
@@ -119,6 +121,145 @@ def _calculate_msd_robust(
         'msd_up': z * sigma_up,
         'msd_dn': z * sigma_dn,
     })
+
+
+def fit_control_stats(
+    twa: Union[pd.DataFrame, np.ndarray],
+    genes=None,
+    alpha: float = 0.05,
+    asymmetric: bool = True,
+    kappa: float = 1.4826,
+    chunk_genes: int = 2000,
+) -> pd.DataFrame:
+    """Memory-safe robust MSD *fit* over the control (TWA) group.
+
+    Computes the same per-gene robust ``center`` / ``msd_up`` / ``msd_dn`` as
+    :func:`_calculate_msd_robust`, but in NumPy and **chunked over genes**, so peak
+    temporary memory is ~``chunk_genes x n_controls`` instead of the full matrix. The
+    pandas path materializes several ``genes x controls`` float64 temporaries at once
+    (``devs``, ``pos``, ``neg``, ``|devs|``, two quantiles) and OOMs at scSeq scale
+    (tens of thousands of control cells).
+
+    This is the "fit" half of a fit/transform split: call it once on the controls, then
+    feed the returned table to :func:`weighted_from_stats` to rank each sample without
+    ever building the per-sample dict that :func:`calculate_ranking` returns.
+
+    Args:
+        twa: Control sub-matrix as ``genes x controls``. Either a NumPy array, or a
+            DataFrame whose columns are the TWA samples (columns starting with ``tw``
+            are selected; its index is used as ``genes``).
+        genes: Optional gene labels for the result index (used when ``twa`` is an array).
+        alpha: Significance level for the z multiplier. Default 0.05.
+        asymmetric: Directional (double) MAD for skewed baselines. Default True.
+        kappa: MAD->sigma consistency constant (1.4826 for Gaussian).
+        chunk_genes: Genes processed per block. Lower it to cap memory further.
+
+    Returns:
+        DataFrame indexed by gene with columns ``center``, ``msd_up``, ``msd_dn`` --
+        identical in meaning to :func:`_calculate_msd_robust`'s output.
+    """
+    if isinstance(twa, pd.DataFrame):
+        cols = [c for c in twa.columns if c.startswith('tw')]
+        if genes is None:
+            genes = twa.index
+        arr = twa[cols].to_numpy(dtype=np.float32, copy=False)
+    else:
+        arr = np.asarray(twa, dtype=np.float32)
+
+    n_genes, n_ctrl = arr.shape
+    if n_ctrl < 3:
+        raise ValueError("Robust MSD requires >= 3 TWA samples.")
+
+    center = np.empty(n_genes, np.float32)
+    sigma_sym = np.empty(n_genes, np.float32)
+    sigma_iqr = np.empty(n_genes, np.float32)
+    sigma_up = np.empty(n_genes, np.float32)
+    sigma_dn = np.empty(n_genes, np.float32)
+
+    for s in range(0, n_genes, chunk_genes):
+        e = min(s + chunk_genes, n_genes)
+        blk = arr[s:e]                                  # chunk x controls
+        med = np.median(blk, axis=1)
+        center[s:e] = med
+        devs = blk - med[:, None]
+        sig_sym = kappa * np.median(np.abs(devs), axis=1)
+        sigma_sym[s:e] = sig_sym
+        q75, q25 = np.percentile(blk, [75, 25], axis=1)
+        sigma_iqr[s:e] = (q75 - q25) / 1.349
+
+        if asymmetric:
+            # nanmedian warns "All-NaN slice" for genes whose tail has no deviations;
+            # that case is handled by the sig_sym fallback below, so mute the noise.
+            with np.errstate(invalid='ignore'), warnings.catch_warnings():
+                warnings.simplefilter('ignore', category=RuntimeWarning)
+                mad_up = np.nanmedian(np.where(devs > 0, devs, np.nan), axis=1)
+                mad_dn = np.nanmedian(np.where(devs < 0, -devs, np.nan), axis=1)
+            su = kappa * mad_up
+            sd = kappa * mad_dn
+            # empty/zero tail -> symmetric MAD (matches _calculate_msd_robust ordering)
+            su = np.where(np.isfinite(su) & (su > 0), su, sig_sym)
+            sd = np.where(np.isfinite(sd) & (sd > 0), sd, sig_sym)
+        else:
+            su = sig_sym.copy()
+            sd = sig_sym.copy()
+        sigma_up[s:e] = su
+        sigma_dn[s:e] = sd
+
+    pool = sigma_sym[sigma_sym > 0]
+    global_sigma = max(float(np.median(pool)) if pool.size else 1e-6, 1e-6)
+
+    def _apply_fallbacks(sig):
+        sig = sig.copy()
+        bad = ~(np.isfinite(sig) & (sig > 0))
+        sig[bad] = sigma_iqr[bad]
+        bad = ~(np.isfinite(sig) & (sig > 0))
+        sig[bad] = global_sigma
+        return sig
+
+    sigma_up = _apply_fallbacks(sigma_up)
+    sigma_dn = _apply_fallbacks(sigma_dn)
+
+    z = norm.ppf(1 - alpha / 2)
+    out = pd.DataFrame({
+        'center': center,
+        'msd_up': z * sigma_up,
+        'msd_dn': z * sigma_dn,
+    })
+    if genes is not None:
+        out.index = pd.Index(genes)
+    return out
+
+
+def weighted_from_stats(
+    expr: np.ndarray,
+    stats: pd.DataFrame,
+) -> np.ndarray:
+    """Vectorized MSD-normalized ranking ('weighted') from precomputed control stats.
+
+    The dict-free *transform* half of the fit/transform split. Reproduces exactly the
+    ``weighted`` column of :func:`calculate_ranking`
+    (``(expr - center) / directional_scale``) for one or many samples at once, returning
+    a plain array instead of a per-sample dict of 5-column DataFrames -- the latter is
+    ``n_samples x n_genes x 5`` and cannot scale to single-cell sample counts.
+
+    Args:
+        expr: Expression aligned to ``stats.index``. Shape ``(genes,)`` for one sample or
+            ``(samples, genes)`` for a block.
+        stats: Output of :func:`fit_control_stats` / :func:`_calculate_msd_robust`
+            (columns ``center``, ``msd_up``, ``msd_dn``).
+
+    Returns:
+        ndarray of the ``weighted`` statistic, same leading shape as ``expr``. Genes with
+        a non-positive directional scale are ``nan`` (drop/sort before ranking).
+    """
+    center = stats['center'].to_numpy(np.float32)
+    msd_up = stats['msd_up'].to_numpy(np.float32)
+    msd_dn = stats['msd_dn'].to_numpy(np.float32)
+    d = np.asarray(expr, dtype=np.float32) - center
+    scale = np.where(d >= 0, msd_up, msd_dn)
+    scale = np.where(scale > 0, scale, np.nan)
+    return d / scale
+
 
 def calculate_ranking(
     df: pd.DataFrame,

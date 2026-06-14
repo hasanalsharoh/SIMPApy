@@ -25,6 +25,8 @@ import contextlib
 from typing import Dict, List, Union, Optional, Tuple
 import logging # Import the logging library
 
+from .ranking import weighted_from_stats
+
 
 @contextlib.contextmanager
 def _quiet_gseapy():
@@ -128,6 +130,23 @@ def _parallel_supported() -> bool:
     return sys.platform != "win32" and "spawn" in _mp.get_all_start_methods()
 
 
+def _sc_parallel_supported(allow_windows: bool) -> bool:
+    """Whether ``sopa_sc`` may use its parallel pool on this platform.
+
+    Unlike the bulk path (:func:`_parallel_supported`, which keeps Windows sequential by
+    project decision), ``sopa_sc``'s pool target and initializer live in this importable
+    module rather than ``__main__``, so the usual Windows-spawn re-import pitfall does not
+    apply and the 'spawn' pool can run on Windows too. It stays opt-in (``allow_windows``)
+    because gseapy's Rust backend under Windows spawn is not part of the regular test matrix
+    — verify a small run before an unattended one.
+    """
+    if "spawn" not in _mp.get_all_start_methods():
+        return False
+    if sys.platform == "win32":
+        return allow_windows
+    return True
+
+
 # Heuristics for the RAM-aware auto worker count. Each spawned worker is a fresh
 # Python+gseapy process whose steady-state RSS on this codebase's Hallmark workload
 # (9k genes, 50 sets, 1000 perms) measured ~0.5 GB; 0.6 leaves margin. We also keep a
@@ -188,12 +207,20 @@ def _available_ram_gb() -> Optional[float]:
     return host if cgroup is None else min(host, cgroup)
 
 
-def _resolve_processes(processes: int, worker_threads: int = 1, matrix_gb: float = 0.0) -> int:
+def _resolve_processes(processes: int, worker_threads: int = 1, matrix_gb: float = 0.0,
+                       per_worker_gb: Optional[float] = None) -> int:
     """Resolve the worker count. ``processes <= 0`` auto-selects, bounded by BOTH cores and
     free RAM: leave 2 cores free (divided by ``worker_threads`` so total OS threads don't
     oversubscribe), and fit within available RAM after reserving headroom + the shared
     matrix. When RAM can't be measured (non-Linux), falls back to the old fixed cap of 8.
-    A positive ``processes`` is honored as-is (the user's explicit choice)."""
+    A positive ``processes`` is honored as-is (the user's explicit choice).
+
+    ``per_worker_gb`` overrides the per-worker RAM estimate. The default (``_PER_WORKER_GB``,
+    ~0.6 GB) is calibrated for the bulk ``sopa`` worker, which only attaches shared memory.
+    The single-cell worker also imports anndata/h5py and runs prerank over the full gene
+    axis, peaking ~1.8 GB at 23k genes, so ``sopa_sc`` passes a larger, gene-count-aware
+    value here -- without it the auto count overshoots RAM by ~3x and the box OOMs."""
+    pw = _PER_WORKER_GB if per_worker_gb is None else per_worker_gb
     if processes is None or processes <= 0:
         core_budget = max(1, (_usable_cores() - 2) // max(1, worker_threads))
         avail = _available_ram_gb()
@@ -202,12 +229,12 @@ def _resolve_processes(processes: int, worker_threads: int = 1, matrix_gb: float
             logging.info("SOPA auto: RAM unknown; using %d worker(s) (cores=%d, capped at 8).",
                          n, core_budget)
             return max(1, n)
-        ram_budget = int(max(0.0, avail - _RAM_RESERVE_GB - matrix_gb) / _PER_WORKER_GB)
+        ram_budget = int(max(0.0, avail - _RAM_RESERVE_GB - matrix_gb) / pw)
         n = max(1, min(core_budget, ram_budget))
         logging.info(
             "SOPA auto: %d worker(s) [core budget %d, RAM budget %d @ %.1f GB avail, "
-            "%.1f GB reserved + %.2f GB shared matrix].",
-            n, core_budget, ram_budget, avail, _RAM_RESERVE_GB, matrix_gb,
+            "%.1f GB reserved + %.2f GB shared matrix, %.2f GB/worker].",
+            n, core_budget, ram_budget, avail, _RAM_RESERVE_GB, matrix_gb, pw,
         )
         return n
     return processes
@@ -403,6 +430,236 @@ def sopa(
 
         # Clean up
         del gsea_result, ranking
+
+
+# =============================================================================
+# Single-cell streaming path (sopa_sc)
+#
+# For scSeq/SOPA where every cell is a "sample" (tens of thousands), materializing
+# the genes x samples ranking matrix that `sopa` consumes is infeasible (it would be
+# copied again into shared memory). Instead, `sopa_sc` reads expression on demand from a
+# backed AnnData (the full matrix never enters RAM) and computes each cell's `weighted`
+# ranking inside the worker from precomputed control `stats` (fit_control_stats), so peak
+# RAM is ~one batch + gseapy per worker. The numerical result per cell is identical to
+# ranking with calculate_ranking/weighted_from_stats then running `sopa`.
+#
+# This is purely additive: `sopa`, `_sopa`, and `_sopa_parallel` are untouched, so the
+# bulk workflow is unchanged.
+# =============================================================================
+
+# Cells handled by a worker before it is recycled (resets the gradual gseapy/Rust
+# per-call slowdown and bounds memory), mirroring `_MAXTASKS_PER_CHILD` for the bulk path.
+_SC_CELLS_PER_CHILD = 1000
+
+# Per-worker state for the single-cell path (backed AnnData handle + static inputs).
+_SC_WORKER: dict = {}
+
+
+def _sc_compute_and_write(
+    start, stop, X, gcol, stats, genes, sample_ids,
+    gene_set, minisz, seeder, output_dir, resume, threads, kwargs,
+):
+    """Rank and GSEA one contiguous block of cells [start:stop), writing one CSV each.
+
+    Shared by the sequential and parallel paths. Reads the block once (amortized I/O),
+    computes `weighted` for the whole block vectorized, then runs gseapy per cell.
+
+    The gene universe is whatever ``stats``/``genes`` define (set globally by the caller,
+    e.g. a detection-rate filter on the AnnData). It is the SAME for every cell, so NES/FDR
+    stay comparable across cells -- we deliberately do not prune genes per cell.
+    """
+    names = sample_ids[start:stop]
+    todo = [j for j, nm in enumerate(names)
+            if not (resume and os.path.exists(_output_path(output_dir, nm)))]
+    if not todo:
+        return 0
+
+    block = X[start:stop]
+    if gcol is not None:
+        block = block[:, gcol]
+    block = block.toarray() if hasattr(block, "toarray") else np.asarray(block)
+    block = block.astype(np.float32, copy=False)
+    weighted = weighted_from_stats(block, stats)        # block x genes, no per-cell dict
+
+    call_kw = dict(kwargs)
+    call_kw.pop("threads", None)                         # governed by `threads` below
+    call_kw.setdefault("no_plot", True)
+    call_kw.setdefault("outdir", None)
+
+    for j in todo:
+        nm = names[j]
+        ranking = (pd.Series(weighted[j], index=genes)
+                     .replace([np.inf, -np.inf], np.nan)
+                     .dropna().sort_values(ascending=False))
+        gsea_result = _sopa(ranking=ranking, gene_set=gene_set, minisz=minisz,
+                            seeder=seeder, threads=threads, **call_kw)
+        gsea_result.to_csv(_output_path(output_dir, nm), sep=',')
+    return len(todo)
+
+
+def _sc_worker_init(adata_path, use_raw, gcol, stats, genes, sample_ids,
+                    gene_set, minisz, seeder, output_dir, resume, worker_threads, kwargs):
+    """Initializer run once per spawned worker: open an independent read-only backed
+    handle on the AnnData and stash the static inputs. Each process opens its own HDF5
+    handle (concurrent readers are safe); file locking is disabled defensively so
+    concurrent opens never error on shared/HPC filesystems."""
+    os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
+    import anndata as ad
+    adata = ad.read_h5ad(adata_path, backed="r")
+    X = adata.raw.X if use_raw else adata.X
+    _SC_WORKER.update(
+        adata=adata, X=X, gcol=gcol, stats=stats, genes=pd.Index(genes),
+        sample_ids=sample_ids, gene_set=gene_set, minisz=minisz, seeder=seeder,
+        output_dir=output_dir, resume=resume, worker_threads=worker_threads, kwargs=kwargs,
+    )
+
+
+def _run_sc_batch(batch):
+    """Worker entry point: rank+GSEA one (start, stop) cell block from shared state."""
+    start, stop = batch
+    w = _SC_WORKER
+    return _sc_compute_and_write(
+        start, stop, w["X"], w["gcol"], w["stats"], w["genes"], w["sample_ids"],
+        w["gene_set"], w["minisz"], w["seeder"], w["output_dir"], w["resume"],
+        w["worker_threads"], w["kwargs"],
+    )
+
+
+def sopa_sc(
+    adata_path: str,
+    stats: pd.DataFrame,
+    gene_set: Union[Dict, str],
+    output_dir: str,
+    sample_ids,
+    use_raw: bool = True,
+    minisz: int = 3,
+    seeder: int = 7,
+    permutation_num: int = 1000,
+    processes: int = -1,
+    worker_threads: int = 1,
+    resume: bool = True,
+    batch_size: int = 64,
+    per_worker_gb: Optional[float] = None,
+    allow_windows_parallel: bool = False,
+    **kwargs,
+) -> None:
+    """Run SOPA per cell for single-cell/spatial data, ranking on-read (no genes x cells
+    matrix held in memory).
+
+    Expression is read in row-blocks from a backed AnnData at ``adata_path``; each cell's
+    ``weighted`` ranking is computed from ``stats`` (the control fit from
+    :func:`~SIMPApy.fit_control_stats`) and run through gseapy, writing one
+    ``{sample_id}_gsea_results.csv`` per cell. Per-cell output is identical to building the
+    ranking with :func:`~SIMPApy.weighted_from_stats` and calling :func:`sopa`.
+
+    Args:
+        adata_path: Path to the ``.h5ad`` file. Opened ``backed='r'`` in every worker.
+        stats: Control statistics indexed by gene (``center``, ``msd_up``, ``msd_dn``),
+            e.g. from ``fit_control_stats``. ``stats.index`` selects and orders the genes;
+            all must exist in the AnnData's (raw) var names.
+        gene_set: Gene-set database (GMT path or dict), as in :func:`sopa`.
+        output_dir: Directory for the per-cell result CSVs.
+        sample_ids: Per-cell names aligned to AnnData obs order (length == n_obs), e.g. the
+            ``tw*``/``tm*`` ids. Used as output filenames and for ``resume``.
+        use_raw: Read from ``adata.raw.X`` (default) or ``adata.X``.
+        minisz, seeder: Passed to gseapy via :func:`_sopa`.
+        permutation_num: gseapy permutations per cell (default ``1000``, as in the bulk
+            path). At scSeq sparsity the per-cell ranking is tie-heavy and prerank cost is
+            dominated by tie-handling over the gene axis, not permutations -- lowering this
+            barely speeds anything, so the statistically standard 1000 is kept. The way to
+            speed up the per-cell cost is a smaller, globally-filtered gene universe (fewer
+            genes / fewer tied zeros), not fewer permutations.
+        processes: Worker count. ``<=0`` auto-selects from cores and free RAM (see
+            :func:`_resolve_processes`); ``1`` forces the sequential path; ``>1`` uses a
+            'spawn' pool (falls back to sequential on unsupported platforms).
+        worker_threads: gseapy threads per worker (parallel path). Default 1 (gseapy
+            threading gives no speedup on this per-call workload; prefer more processes).
+        resume: Skip cells whose result CSV already exists (default True).
+        batch_size: Cells read/ranked per I/O block (also the parallel task granularity).
+        per_worker_gb: Override the per-worker RAM estimate used for the auto worker count.
+            Default ``None`` estimates it from the gene count (~0.7 GB base + the prerank
+            footprint over the gene axis), since a single-cell worker imports anndata/h5py
+            and peaks ~1.8 GB at 23k genes -- far above the bulk path's ~0.6 GB. Without
+            this the auto count would overshoot RAM ~3x and OOM the machine.
+        allow_windows_parallel: Opt in to the 'spawn' pool on Windows (default ``False`` ->
+            sequential there, like the bulk path). ``sopa_sc``'s worker/initializer live in
+            this importable module, so Windows spawn can work; it is gated because gseapy on
+            Windows spawn is untested -- verify a small run first. On Windows ``processes<=0``
+            cannot read RAM and caps the auto count at 8, so pass an explicit ``processes``
+            (e.g. 20 on a 24-core/48 GB VM) to use the box fully.
+        **kwargs: Forwarded to ``gp.prerank`` via :func:`_sopa`.
+
+    Returns:
+        None. Results are written to ``output_dir``.
+    """
+    import anndata as ad
+
+    os.makedirs(output_dir, exist_ok=True)
+    sample_ids = list(sample_ids)
+    kwargs.setdefault("permutation_num", permutation_num)
+
+    # Resolve gene columns once in the parent (cheap, backed): map stats genes -> columns.
+    a = ad.read_h5ad(adata_path, backed="r")
+    var = (a.raw.var_names if use_raw else a.var_names)
+    n_obs = a.n_obs
+    if len(sample_ids) != n_obs:
+        raise ValueError(f"sample_ids length {len(sample_ids)} != n_obs {n_obs}.")
+    genes = stats.index
+    gcol = pd.Index(var).get_indexer(genes)
+    if (gcol < 0).any():
+        missing = int((gcol < 0).sum())
+        raise ValueError(f"{missing} genes in stats.index are absent from the AnnData var names.")
+    # If stats already covers every var in order, skip the column-gather entirely.
+    if len(gcol) == len(var) and np.array_equal(gcol, np.arange(len(var))):
+        gcol = None
+    del a
+
+    batches = [(s, min(s + batch_size, n_obs)) for s in range(0, n_obs, batch_size)]
+
+    # Per-worker RAM: ~0.7 GB to import anndata/h5py/gseapy + read a batch, plus the
+    # prerank footprint over the gene axis (measured ~1.8 GB at 23k genes). Linear-in-genes
+    # estimate keeps the auto worker count from overshooting RAM (the cause of the OOM).
+    if per_worker_gb is None:
+        per_worker_gb = 0.7 + len(genes) * 4.7e-5
+
+    use_parallel = processes is not None and processes != 1
+    n_workers = 1
+    if use_parallel:
+        n_workers = _resolve_processes(processes, worker_threads, matrix_gb=0.0,
+                                       per_worker_gb=per_worker_gb)
+        if n_workers > 1 and not _sc_parallel_supported(allow_windows_parallel):
+            if sys.platform == "win32":
+                logging.warning("Parallel sopa_sc is disabled on Windows by default; pass "
+                                "allow_windows_parallel=True to use the spawn pool (verify a "
+                                "small run first). Falling back to sequential.")
+            else:
+                logging.warning("Parallel sopa_sc unsupported on this platform; using sequential.")
+            n_workers = 1
+
+    if n_workers > 1:
+        ctx = _mp.get_context("spawn")
+        maxtasks = max(1, _SC_CELLS_PER_CHILD // max(1, batch_size))
+        initargs = (adata_path, use_raw, gcol, stats, list(genes), sample_ids,
+                    gene_set, minisz, seeder, output_dir, resume, worker_threads, kwargs)
+        logging.info(f"sopa_sc: {n_obs} cells in {len(batches)} batches across "
+                     f"{n_workers} worker(s).")
+        done = 0
+        with ctx.Pool(processes=n_workers, initializer=_sc_worker_init, initargs=initargs,
+                      maxtasksperchild=maxtasks) as pool:
+            for n in pool.imap_unordered(_run_sc_batch, batches, chunksize=1):
+                done += n
+        logging.info(f"sopa_sc: wrote {done} cell result(s).")
+        return
+
+    # Sequential path (works everywhere; also the fallback above).
+    a = ad.read_h5ad(adata_path, backed="r")
+    X = a.raw.X if use_raw else a.X
+    logging.info(f"sopa_sc: {n_obs} cells, sequential.")
+    for start, stop in batches:
+        _sc_compute_and_write(start, stop, X, gcol, stats, pd.Index(genes), sample_ids,
+                              gene_set, minisz, seeder, output_dir, resume,
+                              kwargs.get("threads", 8), kwargs)
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
